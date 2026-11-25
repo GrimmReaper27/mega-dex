@@ -1,0 +1,323 @@
+<title>Mega Dex</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a binder of cards. Each card = a dark viewing stage (the model as the Mega Editor renders it) + its battle sheet. */
+:root {
+  --bg: #eef0f5;
+  --surface: #ffffff;
+  --ink: #161a26;
+  --muted: #5b6178;
+  --line: #d9dce6;
+  --accent: #c2306c;          /* keystone rose */
+  --accent-soft: #f6dde8;
+  --shiny: #0f8a82;
+  --shiny-soft: #d6efed;
+  --warn: #9a5a00;
+  --warn-soft: #fbecd2;
+  --stage: #1a1b26;           /* the render background */
+  --bar-base: #b9bdcc;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10121a; --surface: #181b26; --ink: #e9ebf3; --muted: #9aa0b8; --line: #2a2e3d;
+    --accent: #ff6fa5; --accent-soft: #3a1d2b; --shiny: #4fd1c5; --shiny-soft: #133331;
+    --warn: #f2b84b; --warn-soft: #3a2c12; --bar-base: #4a5066; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10121a; --surface: #181b26; --ink: #e9ebf3; --muted: #9aa0b8; --line: #2a2e3d;
+  --accent: #ff6fa5; --accent-soft: #3a1d2b; --shiny: #4fd1c5; --shiny-soft: #133331;
+  --warn: #f2b84b; --warn-soft: #3a2c12; --bar-base: #4a5066; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 36px 64px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+header { display: grid; gap: 10px; margin-bottom: 26px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(36px, 6vw, 60px); font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.lede { color: var(--muted); max-width: 62ch; margin: 0; }
+.tally { display: flex; flex-wrap: wrap; gap: 8px 22px; font-family: var(--mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tally b { color: var(--ink); font-weight: 700; }
+
+.controls { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px; margin-bottom: 18px; display: grid; gap: 10px; border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.search { flex: 1 1 220px; min-width: 0; font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+select { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.chip { font: 600 12px/1 var(--body); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.chip[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.chip i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.count { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-left: auto; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.stage { position: relative; aspect-ratio: 1 / 0.9; max-width: 100%; background: var(--stage); overflow: hidden; }
+.stage img.model { width: 100%; height: 100%; object-fit: contain; padding: 30px 18px 26px; display: block; }
+.stage .none { color: #8a90a8; font-size: 13px; display: grid; place-items: center; height: 100%; padding: 24px; text-align: center; }
+.dexno { position: absolute; left: 12px; bottom: 10px; font: 700 12px var(--mono); color: #c9cde0; letter-spacing: .05em; }
+.boxicon { position: absolute; left: 8px; top: 6px; width: 64px; height: 32px; image-rendering: pixelated; }
+.toggle { position: absolute; right: 10px; top: 10px; display: flex; background: rgba(10, 11, 18, .72); border-radius: 999px; padding: 3px; }
+.toggle button { font: 700 11px var(--body); letter-spacing: .04em; text-transform: uppercase; border: 0; background: transparent; color: #c9cde0; padding: 5px 10px; border-radius: 999px; cursor: pointer; }
+.toggle button[aria-pressed="true"] { background: #f4f5fa; color: #161a26; }
+.toggle button.sh[aria-pressed="true"] { background: #4fd1c5; color: #0b2826; }
+.toggle button:disabled { opacity: .35; cursor: default; }
+.sheet { padding: 14px 16px 16px; display: grid; gap: 12px; }
+.title { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.title h2 { font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
+.species { color: var(--muted); font-size: 13px; }
+.types { display: flex; gap: 6px; flex-wrap: wrap; }
+.type { font: 700 11px var(--body); letter-spacing: .06em; text-transform: uppercase; padding: 4px 9px; border-radius: 5px; color: #fff; }
+.flag { font: 700 11px var(--body); padding: 3px 8px; border-radius: 5px; }
+.flag.wip { background: var(--warn-soft); color: var(--warn); }
+.flag.newab { background: var(--accent-soft); color: var(--accent); }
+.flag.off { background: var(--warn-soft); color: var(--warn); }
+.stats { display: grid; grid-template-columns: 34px 1fr 34px; gap: 3px 8px; align-items: center; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.stats .k { color: var(--muted); }
+.stats .v { text-align: right; font-weight: 700; }
+.bar { height: 8px; border-radius: 4px; background: var(--line); position: relative; overflow: hidden; }
+.bar span { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 4px; }
+.bar .b { background: var(--bar-base); }
+.bar .g { background: var(--accent); }
+.bar .l { background: var(--warn); opacity: .55; }
+.total { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 6px; }
+.total b { color: var(--ink); }
+.total .up { color: var(--accent); }
+.block h3 { font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+.block .name { font-weight: 700; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.block p { margin: 2px 0 0; font-size: 14px; }
+.where { margin: 4px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+.where li::before { content: "› "; color: var(--accent); }
+.empty { padding: 40px; text-align: center; color: var(--muted); grid-column: 1 / -1; }
+footer { margin-top: 36px; color: var(--muted); font-size: 13px; max-width: 70ch; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.tabs a { font: 700 15px var(--display); color: var(--muted); text-decoration: none; padding: 10px 14px; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs a span { font: 500 12px var(--mono); margin-left: 4px; }
+.ablist { display: grid; gap: 10px; }
+.ab { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 8px 22px; }
+@media (max-width: 720px) { .ab { grid-template-columns: 1fr; } }
+.ab .head { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ab h2 { font-size: 18px; font-weight: 700; }
+.ab .num { font: 500 12px var(--mono); color: var(--muted); }
+.ab p { margin: 4px 0 0; font-size: 14px; }
+.ab .copies { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.flag.game { background: var(--line); color: var(--muted); }
+.owners h3 { font: 700 12px var(--body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+.owners .list { display: flex; flex-wrap: wrap; gap: 6px; }
+.owner { font: 600 13px var(--body); display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px 3px 4px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+.owner img { width: 40px; height: 20px; image-rendering: pixelated; }
+.owner.noicon { padding-left: 10px; }
+.nobody { font-size: 13px; color: var(--muted); font-style: italic; }
+@media (prefers-reduced-motion: no-preference) { .stage img.model { transition: opacity .18s ease; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Omega Ruby · Alpha Sapphire mod</div>
+    <h1>Mega Dex</h1>
+    <p class="lede">Every custom Mega Evolution in the Mega Editor project: its look and shiny as the editor renders them, its stats against the normal form, its ability and where to find its Mega Stone.</p>
+    <div class="tally" id="tally"></div>
+  </header>
+
+  <nav class="tabs" aria-label="Sections">
+    <a href="#megas" id="tabMegas">Megas<span id="nMegas"></span></a>
+    <a href="#abilities" id="tabAbilities">Abilities<span id="nAbilities"></span></a>
+  </nav>
+
+  <section id="viewAbilities" hidden>
+    <div class="controls">
+      <div class="row">
+        <input class="search" id="aq" type="search" placeholder="Search an ability or a Mega" aria-label="Search abilities">
+        <select id="akind" aria-label="Show abilities">
+          <option value="all">All abilities</option>
+          <option value="new">New abilities</option>
+          <option value="game">Game abilities</option>
+          <option value="free">Not given to a Mega yet</option>
+          <option value="off">Not fully working yet</option>
+        </select>
+        <span class="count" id="acount"></span>
+      </div>
+    </div>
+    <div class="ablist" id="ablist"></div>
+  </section>
+
+  <section id="viewMegas">
+  <div class="controls">
+    <div class="row">
+      <input class="search" id="q" type="search" placeholder="Search a Pokémon, Mega, ability or stone" aria-label="Search">
+      <select id="sort" aria-label="Sort">
+        <option value="dex">Dex number</option>
+        <option value="bst">Highest total</option>
+        <option value="gain">Biggest Mega boost</option>
+        <option value="name">Name</option>
+      </select>
+      <select id="state" aria-label="Show">
+        <option value="all">All Megas</option>
+        <option value="made">Finished</option>
+        <option value="wip">In progress</option>
+        <option value="newab">With a new ability</option>
+      </select>
+      <button class="chip" id="allShiny" aria-pressed="false" type="button">Show all shinies</button>
+    </div>
+    <div class="row" id="types"></div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  </section>
+
+  <footer>Pictures are the Mega Editor's previews (idle pose), not in-game screenshots. Stats bars: grey is the normal form, rose is what Mega Evolution adds. Made with Mega Editor; updated <span id="stamp"></span>.</footer>
+</div>
+
+<script type="application/json" id="data">[{"species":62,"speciesName":"Poliwrath","name":"Mega Poliwrath","made":true,"types":["Dark","Fighting"],"stats":[90,125,115,100,110,70],"base":[90,95,95,70,90,70],"ability":"Dark Tide","abilityText":"Water Moves become Dark, Boosts by 20%.","abilityNew":true,"abilityWorks":false,"abilityPartly":false,"stone":"Poliwrathite","stoneText":"A Mega Stone that swirls like a dark tide. Have Poliwrath hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n62.png","shinyPic":"img/s62.png","icon":"img/i62.png"},{"species":101,"speciesName":"Electrode","name":"Mega Electrode","made":true,"types":["Electric",null],"stats":[60,70,90,115,85,170],"base":[60,50,70,80,80,150],"ability":"Prototype","abilityText":"Upon Entry, a random stat raises by 2 stages.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Electrodite","stoneText":"A Mega Stone shaped like a Master Ball. Have Electrode hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n101.png","shinyPic":"img/s101.png","icon":"img/i101.png"},{"species":134,"speciesName":"Vaporeon","name":"Mega Vaporeon","made":false,"types":["Water","Poison"],"stats":[150,65,80,130,115,85],"base":[130,65,60,110,95,65],"ability":"Water Absorb","abilityText":"Restores HP if hit by a Water-type move.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Vaporeonite","stoneText":"A Mega Stone that drips with deadly venom. Have Vaporeon hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n134.png","shinyPic":"img/s134.png"},{"species":135,"speciesName":"Jolteon","name":"Mega Jolteon","made":true,"types":["Electric","Normal"],"stats":[65,85,80,130,115,150],"base":[65,65,60,110,95,130],"ability":"Resonant Current","abilityText":"After a sound move, its next Electric move is 50% stronger.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Jolteonite","stoneText":"A Mega Stone crackling with storm lightning. Have Jolteon hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n135.png","shinyPic":"img/s135.png","icon":"img/i135.png"},{"species":136,"speciesName":"Flareon","name":"Mega Flareon","made":false,"types":["Fire","Ground"],"stats":[65,150,80,115,130,85],"base":[65,130,60,95,110,65],"ability":"Flash Fire","abilityText":"Powers up the Pokémon’s Fire-type moves if it’s hit by one.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Flareonite","stoneText":"Have Flareon hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n136.png","shinyPic":"img/s136.png"},{"species":160,"speciesName":"Feraligatr","name":"Mega Feraligatr","made":true,"types":["Water","Dark"],"stats":[85,135,120,79,103,108],"base":[85,105,100,79,83,78],"ability":"Apex Predator","abilityText":"Lowers opposing Pokémon's Attack and powers up biting moves.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Feraligatrite","stoneText":"A Mega Stone as dark as a river's depths. Have Feraligatr hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n160.png","shinyPic":"img/s160.png","icon":"img/i160.png"},{"species":186,"speciesName":"Politoed","name":"Mega Politoed","made":true,"types":["Water",null],"stats":[90,95,95,100,120,100],"base":[90,75,75,90,100,70],"ability":"Storm’s Eye","abilityText":"In rain, all of its moves hit with perfect accuracy.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Politoedite","stoneText":"A Mega Stone that hums like falling rain. Have Politoed hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":true,"pic":"img/n186.png","shinyPic":"img/s186.png","icon":"img/i186.png"},{"species":196,"speciesName":"Espeon","name":"Mega Espeon","made":true,"types":["Psychic","Fighting"],"stats":[65,85,80,150,115,130],"base":[65,65,60,130,95,110],"ability":"Focus Strike","abilityText":"Its first move each time it enters is 50% stronger.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Espeonite","stoneText":"A Mega Stone that hones the mind to a blade. Have Espeon hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n196.png","shinyPic":"img/s196.png","icon":"img/i196.png"},{"species":197,"speciesName":"Umbreon","name":"Mega Umbreon","made":true,"types":["Dark","Flying"],"stats":[95,85,130,80,150,85],"base":[95,65,110,60,130,65],"ability":"Crimson Rain","abilityText":"Calls a Crimson rain that powers Dark moves and hurts other foes.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Umbreonite","stoneText":"A Mega Stone bathed in blood-red moonlight. Have Umbreon hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n197.png","shinyPic":"img/s197.png","icon":"img/i197.png"},{"species":211,"speciesName":"Qwilfish","name":"Mega Qwilfish","made":true,"types":["Water","Poison"],"stats":[65,125,85,55,85,115],"base":[65,95,85,55,55,85],"ability":"Venom Quills","abilityText":"Contact moves poison, water does 1.3x damage to poisoned foes.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Qwilfishite","stoneText":"A Mega Stone that glows like a sea mine. Have Qwilfish hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n211.png","shinyPic":"img/s211.png","icon":"img/i211.png"},{"species":249,"speciesName":"Lugia","name":"Mega Lugia","made":true,"types":["Water","Flying"],"stats":[106,115,150,125,154,130],"base":[106,90,130,90,154,110],"ability":"Oceanic Purity","abilityText":"Blocks status conditions and stat drops caused by others.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Lugite","stoneText":"A Mega Stone that swirls like the tide. Have Lugia hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":true,"pic":"img/n249.png","shinyPic":"img/s249.png","icon":"img/i249.png"},{"species":250,"speciesName":"Ho-Oh","name":"Mega Ho-Oh","made":true,"types":["Fire","Flying"],"stats":[106,150,115,150,154,105],"base":[106,130,90,110,154,90],"ability":"Magic Guard","abilityText":"The Pokémon only takes damage from attacks.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Ho-Ohite","stoneText":"A Mega Stone that burns with sacred fire. Have Ho-Oh hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n250.png","shinyPic":"img/s250.png","icon":"img/i250.png"},{"species":260,"speciesName":"Swampert","name":"Mega Swampert Y","made":true,"types":["Water","Poison"],"stats":[100,95,115,150,115,60],"base":[100,110,90,85,90,60],"ability":"Corrosive Bloom","abilityText":"Boosts its own types' moves, and its poison corrodes Steel types.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Swampertite Y","stoneText":"A Mega Stone steeped in a poisoned bog. Have Swampert hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n260.png","shinyPic":"img/s260.png"},{"species":272,"speciesName":"Ludicolo","name":"Mega Ludicolo","made":true,"types":["Grass",null],"stats":[80,90,90,130,120,70],"base":[80,70,70,90,100,70],"ability":"Weather Dance","abilityText":"Changes the weather each turn and is immune to sand and hail.","abilityNew":true,"abilityWorks":false,"abilityPartly":false,"stone":"Ludicolite","stoneText":"A Mega Stone that dances with the monsoon. Have Ludicolo hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n272.png","shinyPic":"img/s272.png","icon":"img/i272.png"},{"species":286,"speciesName":"Breloom","name":"Mega Breloom","made":true,"types":["Grass","Fighting"],"stats":[60,150,90,70,90,100],"base":[60,130,80,60,60,70],"ability":"Root Sink","abilityText":"1/4 damage taken from flying, 30% more grass damage with rain.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Breloomite","stoneText":"A Mega Stone speckled like a toadstool cap. Have Breloom hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n286.png","shinyPic":"img/s286.png","icon":"img/i286.png"},{"species":324,"speciesName":"Torkoal","name":"Mega Torkoal","made":true,"types":["Fire","Rock"],"stats":[70,105,160,145,80,10],"base":[70,85,140,85,70,20],"ability":"Desolate Land","abilityText":"Affects weather and nullifies any Water-type attacks.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Torkoalite","stoneText":"A Mega Stone with magma churning inside. Have Torkoal hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":true,"pic":"img/n324.png","shinyPic":"img/s324.png","icon":"img/i324.png"},{"species":330,"speciesName":"Flygon","name":"Mega Flygon","made":true,"types":["Bug","Dragon"],"stats":[80,120,90,110,90,130],"base":[80,100,80,80,80,100],"ability":"Levitate","abilityText":"Gives full immunity to all Ground-type moves.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Flygonite","stoneText":"A Mega Stone that hums like beating wings. Have Flygon hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":true,"pic":"img/n330.png","shinyPic":"img/s330.png","icon":"img/i330.png"},{"species":335,"speciesName":"Zangoose","name":"Mega Zangoose","made":true,"types":["Normal","Fighting"],"stats":[73,150,75,60,75,125],"base":[73,115,60,60,60,90],"ability":"Serpent Slayer","abilityText":"Hits Ghost types, and strikes its rival Mega Seviper harder.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Zangoosite","stoneText":"A Mega Stone streaked with a scar-red vein. Have Zangoose hold it, and this stone will enable it to Mega Evolve during battle.","where":["held by wild Zangoose (50%)","lying on the ground in 1 spot"],"shinyOwn":false,"pic":"img/n335.png","shinyPic":"img/s335.png","icon":"img/i335.png"},{"species":336,"speciesName":"Seviper","name":"Mega Seviper","made":true,"types":["Poison","Dark"],"stats":[73,130,95,100,95,65],"base":[73,100,60,100,60,65],"ability":"Mongoose Bane","abilityText":"Intimidates foes, and strikes its rival Mega Zangoose harder.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Seviperite","stoneText":"A Mega Stone that glints like a venom fang. Have Seviper hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":true,"pic":"img/n336.png","shinyPic":"img/s336.png","icon":"img/i336.png"},{"species":350,"speciesName":"Milotic","name":"Mega Milotic","made":true,"types":["Water","Fairy"],"stats":[95,90,109,120,145,81],"base":[95,60,79,100,125,81],"ability":"Marvel Scale","abilityText":"Boosts the Defense stat if the Pokémon has a status condition.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Milotite","stoneText":"A Mega Stone that shimmers like a rainbow. Have Milotic hold it, and this stone will enable it to Mega Evolve during battle.","where":["held by wild Milotic (5%)","held by 3 other kinds of wild Pokémon","lying on the ground in 2 spots"],"shinyOwn":false,"pic":"img/n350.png","shinyPic":"img/s350.png","icon":"img/i350.png"},{"species":398,"speciesName":"Staraptor","name":"Mega Staraptor","made":true,"types":["Normal","Flying"],"stats":[85,135,70,90,70,135],"base":[85,120,70,50,60,100],"ability":"Grit Counter","abilityText":"Stores the recoil it takes and pays it back on its next attack.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Staraptorite","stoneText":"A Mega Stone scarred by a thousand dives. Have Staraptor hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n398.png","shinyPic":"img/s398.png","icon":"img/i398.png"},{"species":468,"speciesName":"Togekiss","name":"Mega Togekiss","made":true,"types":["Fairy","Flying"],"stats":[85,80,130,140,130,80],"base":[85,50,95,120,115,80],"ability":"Peacekeeper","abilityText":"On Entry, lower SpAtk and Atk by one stage each.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Togekissite","stoneText":"A Mega Stone that shines like a dawn sky. Have Togekiss hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n468.png","shinyPic":"img/s468.png","icon":"img/i468.png"},{"species":470,"speciesName":"Leafeon","name":"Mega Leafeon","made":false,"types":["Grass","Steel"],"stats":[65,130,150,80,85,115],"base":[65,110,130,60,65,95],"ability":"Leaf Guard","abilityText":"Prevents status conditions in sunny weather.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Leafeonite","stoneText":"Have Leafeon hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n470.png","shinyPic":"img/s470.png"},{"species":471,"speciesName":"Glaceon","name":"Mega Glaceon","made":false,"types":["Ice","Dragon"],"stats":[65,80,130,150,115,85],"base":[65,60,110,130,95,65],"ability":"Snow Cloak","abilityText":"Boosts evasion in a hailstorm.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Glaceonite","stoneText":"Have Glaceon hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n471.png","shinyPic":"img/s471.png"},{"species":472,"speciesName":"Gliscor","name":"Mega Gliscor","made":true,"types":["Dark","Flying"],"stats":[75,115,135,65,95,125],"base":[75,95,125,45,75,95],"ability":"Vampiric Fangs","abilityText":"Bites hit harder and heal it by half the damage they deal","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Gliscorite","stoneText":"A Mega Stone that glows red in the night. Have Gliscor hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":true,"pic":"img/n472.png","shinyPic":"img/s472.png","icon":"img/i472.png"},{"species":473,"speciesName":"Mamoswine","name":"Mega Mamoswine","made":true,"types":["Ice","Ground"],"stats":[110,150,100,110,90,70],"base":[110,130,80,70,60,80],"ability":"Refrigerate","abilityText":"Normal-type moves become Ice-type moves.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Mamosite","stoneText":"A Mega Stone frozen in ancient glacier ice. Have Mamoswine hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":true,"pic":"img/n473.png","shinyPic":"img/s473.png","icon":"img/i473.png"},{"species":483,"speciesName":"Dialga","name":"Mega Dialga","made":true,"types":["Steel","Dragon"],"stats":[100,150,145,170,125,90],"base":[100,120,120,150,100,90],"ability":"Temporal Rage","abilityText":"Roar of Time does not require recharge upon K/O","abilityNew":true,"abilityWorks":false,"abilityPartly":false,"stone":"Dialgite","stoneText":"Have Dialga hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":true,"pic":"img/n483.png","shinyPic":"img/s483.png","icon":"img/i483.png"},{"species":484,"speciesName":"Palkia","name":"Mega Palkia","made":true,"types":["Water","Dragon"],"stats":[90,150,120,170,140,110],"base":[90,120,100,150,120,100],"ability":"Rift Strike","abilityText":"Spacial Rend lands critical hits more often.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Palkite","stoneText":"A Mega Stone holding a rift torn in space. Have Palkia hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n484.png","shinyPic":"img/s484.png","icon":"img/i484.png"},{"species":488,"speciesName":"Cresselia","name":"Mega Cresselia","made":true,"types":["Psychic","Fairy"],"stats":[120,90,140,115,140,95],"base":[120,70,110,75,120,85],"ability":"Rising Crescent","abilityText":"Its moves grow stronger each turn, like the waxing moon.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Cresselite","stoneText":"A Mega Stone that glows like the full moon. Have Cresselia hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n488.png","shinyPic":"img/s488.png","icon":"img/i488.png"},{"species":491,"speciesName":"Darkrai","name":"Mega Darkrai","made":true,"types":["Dark","Ghost"],"stats":[70,100,110,160,110,150],"base":[70,90,90,135,90,125],"ability":"Lucid Terror","abilityText":"Its attacks treat every foe as if it were asleep.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Darkrite","stoneText":"A Mega Stone holding an eclipsed nightmare. Have Darkrai hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n491.png","shinyPic":"img/s491.png","icon":"img/i491.png"},{"species":545,"speciesName":"Scolipede","name":"Mega Scolipede","made":true,"types":["Bug","Poison"],"stats":[60,130,97,73,93,132],"base":[60,100,89,55,69,112],"ability":"Creepy Crawly","abilityText":"Its creepy legs unnerve foes, lowering their Speed.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Scolipedite","stoneText":"A Mega Stone banded like a giant centipede. Have Scolipede hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n545.png","shinyPic":"img/s545.png","icon":"img/i545.png"},{"species":547,"speciesName":"Whimsicott","name":"Mega Whimsicott","made":true,"types":["Grass","Fairy"],"stats":[60,87,95,107,95,136],"base":[60,67,85,77,75,116],"ability":"Practical Joke","abilityText":"Steals the first stat boost, +1 Priority to Status Moves.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Whimsicottite","stoneText":"A Mega Stone that blooms like a rose. Have Whimsicott hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n547.png","shinyPic":"img/s547.png","icon":"img/i547.png"},{"species":571,"speciesName":"Zoroark","name":"Mega Zoroark","made":true,"types":["Dark","Poison"],"stats":[60,125,80,140,80,125],"base":[60,105,60,120,60,105],"ability":"Fever Dream","abilityText":"Poisons the first foe to hit it. Dark moves hurt poisoned foes.","abilityNew":true,"abilityWorks":false,"abilityPartly":true,"stone":"Zoroarkite","stoneText":"A Mega Stone steeped in venom and illusion. Have Zoroark hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n571.png","shinyPic":"img/s571.png","icon":"img/i571.png"},{"species":579,"speciesName":"Reuniclus","name":"Mega Reuniclus","made":true,"types":["Psychic","Fighting"],"stats":[110,140,103,105,102,30],"base":[110,65,75,125,85,30],"ability":"Iron Jelly Fists","abilityText":"Punches do 1.3x damage and heal 1/4 of the damage dealt.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Reuniclusite","stoneText":"A Mega Stone that pulses like living cells. Have Reuniclus hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n579.png","shinyPic":"img/s579.png","icon":"img/i579.png"},{"species":596,"speciesName":"Galvantula","name":"Mega Galvantula","made":true,"types":["Bug","Dark"],"stats":[70,88,75,136,75,128],"base":[70,77,60,97,60,108],"ability":"Predator's Eyes","abilityText":"Boosts accuracy by 30%. Bug/Dark hits may lower Sp. Def.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Galvantulite","stoneText":"A Mega Stone woven with a crimson web. Have Galvantula hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n596.png","shinyPic":"img/s596.png","icon":"img/i596.png"},{"species":612,"speciesName":"Haxorus","name":"Mega Haxorus","made":true,"types":["Dragon","Dark"],"stats":[76,167,90,100,70,137],"base":[76,147,90,60,70,97],"ability":"Hustle","abilityText":"Boosts the Attack stat, but lowers accuracy.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Haxorite","stoneText":"A Mega Stone as sharp as a dragon tusk. Have Haxorus hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":true,"pic":"img/n612.png","shinyPic":"img/s612.png","icon":"img/i612.png"},{"species":615,"speciesName":"Cryogonal","name":"Mega Cryogonal","made":true,"types":["Ice","Fire"],"stats":[80,60,50,145,145,135],"base":[80,50,50,95,135,105],"ability":"Crystal Chains","abilityText":"It traps foes, Ice move damage boosted by 20%.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Cryogonalite","stoneText":"A Mega Stone frozen at absolute zero. Have Cryogonal hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n615.png","shinyPic":"img/s615.png","icon":"img/i615.png"},{"species":617,"speciesName":"Accelgor","name":"Mega Accelgor","made":false,"types":["Bug","Water"],"stats":[80,90,65,130,65,165],"base":[80,70,40,100,60,145],"ability":"Mucus Veil","abilityText":"Contact moves lower speed, water moves heal 1/4 of damage dealt.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Accelgorite","stoneText":"Have Accelgor hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n617.png","shinyPic":"img/s617.png"},{"species":635,"speciesName":"Hydreigon","name":"Mega Hydreigon","made":true,"types":["Dark","Dragon"],"stats":[92,115,115,145,115,118],"base":[92,105,90,125,90,98],"ability":"Parental Bond","abilityText":"Parent and child attack together.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Hydreigonite","stoneText":"A Mega Stone holding a hydra's ruinous fury. Have Hydreigon hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n635.png","shinyPic":"img/s635.png","icon":"img/i635.png"},{"species":637,"speciesName":"Volcarona","name":"Mega Volcarona","made":true,"types":["Bug","Fire"],"stats":[85,90,85,145,125,120],"base":[85,60,65,135,105,100],"ability":"Solar Corona","abilityText":"Summons harsh sunlight and burns its own life to boost Sp. Atk.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Volcarite","stoneText":"A Mega Stone that burns like a tiny sun. Have Volcarona hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":true,"pic":"img/n637.png","shinyPic":"img/s637.png","icon":"img/i637.png"},{"species":663,"speciesName":"Talonflame","name":"Mega Talonflame","made":true,"types":["Fire","Flying"],"stats":[78,121,86,84,84,146],"base":[78,81,71,74,69,126],"ability":"Afterburn","abilityText":"Recoil moves ×1.2, half recoil Non-Fire recoil: 10% burn","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Talonflamite","stoneText":"A Mega Stone that burns with phoenix fire. Have Talonflame hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n663.png","shinyPic":"img/s663.png","icon":"img/i663.png"},{"species":673,"speciesName":"Gogoat","name":"Mega Gogoat","made":true,"types":["Grass","Rock"],"stats":[123,120,112,97,111,68],"base":[123,100,62,97,81,68],"ability":"Rock Head","abilityText":"Protects the Pokémon from recoil damage.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Gogoatite","stoneText":"A Mega Stone wrapped in autumn leaves. Have Gogoat hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n673.png","shinyPic":"img/s673.png","icon":"img/i673.png"},{"species":699,"speciesName":"Aurorus","name":"Mega Aurorus","made":false,"types":["Rock","Water"],"stats":[123,97,102,124,117,58],"base":[123,77,72,99,92,58],"ability":"Refrigerate","abilityText":"Normal-type moves become Ice-type moves.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Aurorusite","stoneText":"Have Aurorus hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n699.png","shinyPic":"img/s699.png"},{"species":700,"speciesName":"Sylveon","name":"Mega Sylveon","made":true,"types":["Fairy","Ghost"],"stats":[95,85,85,130,150,80],"base":[95,65,65,110,130,60],"ability":"Foxfire Ribbons","abilityText":"Its Fairy moves may burn foes with ghostly fox-fire.","abilityNew":true,"abilityWorks":true,"abilityPartly":false,"stone":"Sylveonite","stoneText":"A Mega Stone that burns with a ghostly wisp. Have Sylveon hold it, and this stone will enable it to Mega Evolve during battle.","where":[],"shinyOwn":false,"pic":"img/n700.png","shinyPic":"img/s700.png","icon":"img/i700.png"},{"species":715,"speciesName":"Noivern","name":"Mega Noivern","made":true,"types":["Flying","Dragon"],"stats":[85,80,90,130,90,160],"base":[85,70,80,97,80,123],"ability":"Aerilate","abilityText":"Normal-type moves become Flying-type moves.","abilityNew":false,"abilityWorks":true,"abilityPartly":false,"stone":"Noivernite","stoneText":"A Mega Stone that echoes with a deep hum. Have Noivern hold it, and this stone will enable it to Mega Evolve during battle.","where":["held by wild Noivern (5%)","held by 3 other kinds of wild Pokémon","lying on the ground in 2 spots"],"shinyOwn":true,"pic":"img/n715.png","shinyPic":"img/s715.png","icon":"img/i715.png"}]</script>
+<script type="application/json" id="abdata">[{"id":192,"name":"Corrosive Bloom","isNew":true,"text":"Boosts its own types' moves, and its poison corrodes Steel types.","works":true,"partly":false,"combines":["Adaptability"],"megas":[{"name":"Mega Swampert Y","species":260}]},{"id":193,"name":"Serpent Slayer","isNew":true,"text":"Hits Ghost types, and strikes its rival Mega Seviper harder.","works":true,"partly":false,"combines":["Scrappy"],"megas":[{"name":"Mega Zangoose","species":335}]},{"id":194,"name":"Solar Corona","isNew":true,"text":"Summons harsh sunlight and burns its own life to boost Sp. Atk.","works":true,"partly":false,"combines":["Drought","Solar Power"],"megas":[{"name":"Mega Volcarona","species":637}]},{"id":195,"name":"Mongoose Bane","isNew":true,"text":"Intimidates foes, and strikes its rival Mega Zangoose harder.","works":true,"partly":false,"combines":["Intimidate"],"megas":[{"name":"Mega Seviper","species":336}]},{"id":196,"name":"Lucid Terror","isNew":true,"text":"Its attacks treat every foe as if it were asleep.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Darkrai","species":491}]},{"id":197,"name":"Rift Strike","isNew":true,"text":"Spacial Rend lands critical hits more often.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Palkia","species":484}]},{"id":198,"name":"Vampiric Fangs","isNew":true,"text":"Bites hit harder and heal it by half the damage they deal","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Gliscor","species":472}]},{"id":199,"name":"Oceanic Purity","isNew":true,"text":"Blocks status conditions and stat drops caused by others.","works":true,"partly":false,"combines":["Clear Body"],"megas":[{"name":"Mega Lugia","species":249}]},{"id":200,"name":"Resonant Current","isNew":true,"text":"After a sound move, its next Electric move is 50% stronger.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Jolteon","species":135}]},{"id":201,"name":"Focus Strike","isNew":true,"text":"Its first move each time it enters is 50% stronger.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Espeon","species":196}]},{"id":202,"name":"Storm’s Eye","isNew":true,"text":"In rain, all of its moves hit with perfect accuracy.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Politoed","species":186}]},{"id":203,"name":"Rising Crescent","isNew":true,"text":"Its moves grow stronger each turn, like the waxing moon.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Cresselia","species":488}]},{"id":204,"name":"Crimson Rain","isNew":true,"text":"Calls a Crimson rain that powers Dark moves and hurts other foes.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Umbreon","species":197}]},{"id":205,"name":"Foxfire Ribbons","isNew":true,"text":"Its Fairy moves may burn foes with ghostly fox-fire.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Sylveon","species":700}]},{"id":206,"name":"Apex Predator","isNew":true,"text":"Lowers opposing Pokémon's Attack and powers up biting moves.","works":true,"partly":false,"combines":["Intimidate","Strong Jaw"],"megas":[{"name":"Mega Feraligatr","species":160}]},{"id":207,"name":"Stampede","isNew":true,"text":"Prevents recoil and boosts recoil moves by 20%","works":true,"partly":false,"combines":["Reckless","Rock Head"],"megas":[]},{"id":208,"name":"Temporal Rage","isNew":true,"text":"Roar of Time does not require recharge upon K/O","works":false,"partly":false,"combines":[],"megas":[{"name":"Mega Dialga","species":483}]},{"id":209,"name":"Weather Dance","isNew":true,"text":"Changes the weather each turn and is immune to sand and hail.","works":false,"partly":false,"combines":[],"megas":[{"name":"Mega Ludicolo","species":272}]},{"id":210,"name":"Grit Counter","isNew":true,"text":"Stores the recoil it takes and pays it back on its next attack.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Staraptor","species":398}]},{"id":211,"name":"Proliferation","isNew":true,"text":"On the first status infliction, it cures it, +1 SpAtk.","works":true,"partly":false,"combines":[],"megas":[]},{"id":212,"name":"Afterburn","isNew":true,"text":"Recoil moves ×1.2, half recoil Non-Fire recoil: 10% burn","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Talonflame","species":663}]},{"id":213,"name":"Crystal Chains","isNew":true,"text":"It traps foes, Ice move damage boosted by 20%.","works":true,"partly":false,"combines":["Shadow Tag"],"megas":[{"name":"Mega Cryogonal","species":615}]},{"id":214,"name":"Predator's Eyes","isNew":true,"text":"Boosts accuracy by 30%. Bug/Dark hits may lower Sp. Def.","works":true,"partly":false,"combines":["Compound Eyes"],"megas":[{"name":"Mega Galvantula","species":596}]},{"id":215,"name":"Dark Tide","isNew":true,"text":"Water Moves become Dark, Boosts by 20%.","works":false,"partly":false,"combines":[],"megas":[{"name":"Mega Poliwrath","species":62}]},{"id":216,"name":"Fever Dream","isNew":true,"text":"Poisons the first foe to hit it. Dark moves hurt poisoned foes.","works":false,"partly":true,"combines":[],"megas":[{"name":"Mega Zoroark","species":571}]},{"id":217,"name":"Practical Joke","isNew":true,"text":"Steals the first stat boost, +1 Priority to Status Moves.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Whimsicott","species":547}]},{"id":218,"name":"Peacekeeper","isNew":true,"text":"On Entry, lower SpAtk and Atk by one stage each.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Togekiss","species":468}]},{"id":219,"name":"Mucus Veil","isNew":true,"text":"Contact moves lower speed, water moves heal 1/4 of damage dealt.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Accelgor","species":617}]},{"id":220,"name":"Creepy Crawly","isNew":true,"text":"Its creepy legs unnerve foes, lowering their Speed.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Scolipede","species":545}]},{"id":221,"name":"Venom Quills","isNew":true,"text":"Contact moves poison, water does 1.3x damage to poisoned foes.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Qwilfish","species":211}]},{"id":222,"name":"Root Sink","isNew":true,"text":"1/4 damage taken from flying, 30% more grass damage with rain.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Breloom","species":286}]},{"id":223,"name":"Prototype","isNew":true,"text":"Upon Entry, a random stat raises by 2 stages.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Electrode","species":101}]},{"id":224,"name":"Iron Jelly Fists","isNew":true,"text":"Punches do 1.3x damage and heal 1/4 of the damage dealt.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Reuniclus","species":579}]},{"id":184,"name":"Aerilate","isNew":false,"text":"Normal-type moves become Flying-type moves.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Noivern","species":715}]},{"id":190,"name":"Desolate Land","isNew":false,"text":"Affects weather and nullifies any Water-type attacks.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Torkoal","species":324}]},{"id":18,"name":"Flash Fire","isNew":false,"text":"Powers up the Pokémon’s Fire-type moves if it’s hit by one.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Flareon","species":136}]},{"id":55,"name":"Hustle","isNew":false,"text":"Boosts the Attack stat, but lowers accuracy.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Haxorus","species":612}]},{"id":102,"name":"Leaf Guard","isNew":false,"text":"Prevents status conditions in sunny weather.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Leafeon","species":470}]},{"id":26,"name":"Levitate","isNew":false,"text":"Gives full immunity to all Ground-type moves.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Flygon","species":330}]},{"id":98,"name":"Magic Guard","isNew":false,"text":"The Pokémon only takes damage from attacks.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Ho-Oh","species":250}]},{"id":63,"name":"Marvel Scale","isNew":false,"text":"Boosts the Defense stat if the Pokémon has a status condition.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Milotic","species":350}]},{"id":185,"name":"Parental Bond","isNew":false,"text":"Parent and child attack together.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Hydreigon","species":635}]},{"id":174,"name":"Refrigerate","isNew":false,"text":"Normal-type moves become Ice-type moves.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Mamoswine","species":473},{"name":"Mega Aurorus","species":699}]},{"id":69,"name":"Rock Head","isNew":false,"text":"Protects the Pokémon from recoil damage.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Gogoat","species":673}]},{"id":81,"name":"Snow Cloak","isNew":false,"text":"Boosts evasion in a hailstorm.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Glaceon","species":471}]},{"id":11,"name":"Water Absorb","isNew":false,"text":"Restores HP if hit by a Water-type move.","works":true,"partly":false,"combines":[],"megas":[{"name":"Mega Vaporeon","species":134}]}]</script>
+<script>
+(function () {
+  const TYPE = { Normal: "#8b8a73", Fighting: "#b8322a", Flying: "#7b6fd6", Poison: "#9440a0", Ground: "#c29a46", Rock: "#a88f34", Bug: "#8a9a1b", Ghost: "#5f4c8f", Steel: "#7d7f9a", Fire: "#e2621f", Water: "#3f78e0", Grass: "#4b9e3a", Electric: "#d3a400", Psychic: "#e0457b", Ice: "#4aa7b0", Dragon: "#5a35d6", Dark: "#5a463a", Fairy: "#d267a8" };
+  const STAT = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"];
+  const megas = JSON.parse(document.getElementById("data").textContent);
+  document.getElementById("stamp").textContent = "26 Nov 2026";
+  const sum = a => a.reduce((x, y) => x + y, 0);
+  megas.forEach(m => { m.types = m.types.filter(Boolean); m.bst = sum(m.stats); m.baseBst = sum(m.base); m.gain = m.bst - m.baseBst; });
+
+  const tally = document.getElementById("tally");
+  const made = megas.filter(m => m.made).length;
+  tally.innerHTML = `<span><b>${megas.length}</b> Megas</span><span><b>${made}</b> finished</span><span><b>${megas.filter(m => m.abilityNew).length}</b> with a new ability</span><span><b>${megas.filter(m => m.shinyPic && m.shinyOwn).length}</b> designed shinies</span>`;
+
+  const st = { q: "", sort: "dex", state: "all", types: new Set(), shiny: false, perCard: {} };
+  const typeRow = document.getElementById("types");
+  const used = Object.keys(TYPE).filter(t => megas.some(m => m.types.includes(t)));
+  used.forEach(t => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.type = "button"; b.setAttribute("aria-pressed", "false");
+    b.innerHTML = `<i style="background:${TYPE[t]}"></i>${t}`;
+    b.addEventListener("click", () => { st.types.has(t) ? st.types.delete(t) : st.types.add(t); b.setAttribute("aria-pressed", st.types.has(t)); draw(); });
+    typeRow.appendChild(b);
+  });
+
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function card(m) {
+    const shiny = (st.perCard[m.species] ?? st.shiny) && m.shinyPic;
+    const pic = shiny ? m.shinyPic : m.pic;
+    const max = 200;
+    const bars = m.stats.map((v, i) => {
+      const b = m.base[i], lo = Math.min(v, b), up = Math.max(0, v - b), down = Math.max(0, b - v);
+      return `<span class="k">${STAT[i]}</span><span class="bar" title="${STAT[i]}: normal ${b}, Mega ${v}"><span class="b" style="width:${Math.min(100, lo / max * 100)}%"></span>` +
+        (up ? `<span class="g" style="left:${Math.min(100, lo / max * 100)}%;width:${Math.min(100 - lo / max * 100, up / max * 100)}%"></span>` : "") +
+        (down ? `<span class="l" style="left:${Math.min(100, lo / max * 100)}%;width:${Math.min(100 - lo / max * 100, down / max * 100)}%"></span>` : "") +
+        `</span><span class="v">${v}</span>`;
+    }).join("");
+    return `<article class="card">
+      <div class="stage">
+        ${pic ? `<img class="model" src="${pic}" alt="${esc(m.name)}${shiny ? " (shiny)" : ""}" loading="lazy" width="400" height="400">` : `<div class="none">No picture: the Mega Editor's preview can't draw this model yet</div>`}
+        ${m.icon ? `<img class="boxicon" src="${m.icon}" alt="" width="64" height="32">` : ""}
+        <div class="toggle" role="group" aria-label="Colours">
+          <button type="button" data-s="${m.species}" data-v="0" aria-pressed="${!shiny}">Normal</button>
+          <button type="button" class="sh" data-s="${m.species}" data-v="1" aria-pressed="${!!shiny}" ${m.shinyPic ? "" : "disabled"}>Shiny</button>
+        </div>
+        <span class="dexno">#${String(m.species).padStart(3, "0")}</span>
+      </div>
+      <div class="sheet">
+        <div class="title"><div><h2>${esc(m.name)}</h2><div class="species">${esc(m.speciesName)}</div></div>
+          <div class="types">${m.types.map(t => `<span class="type" style="background:${TYPE[t] || "#777"}">${esc(t)}</span>`).join("")}${m.made ? "" : `<span class="flag wip">In progress</span>`}</div></div>
+        <div class="stats">${bars}</div>
+        <div class="total"><span>Total <b>${m.bst}</b></span><span>normal ${m.baseBst} <span class="up">${m.gain >= 0 ? "+" : ""}${m.gain}</span></span></div>
+        <div class="block"><h3>Ability</h3>
+          <div class="name">${esc(m.ability || "—")}${m.abilityNew ? `<span class="flag newab">New</span>` : ""}${m.abilityWorks ? "" : `<span class="flag off">${m.abilityPartly ? "Partly working in battle" : "Not working in battle yet"}</span>`}</div>
+          ${m.abilityText ? `<p>${esc(m.abilityText)}</p>` : ""}</div>
+        <div class="block"><h3>Mega Stone</h3>
+          <div class="name">${esc(m.stone || "—")}</div>
+          <p>${esc(m.stoneText)}</p>
+          <ul class="where">${m.where.length ? m.where.map(w => `<li>${esc(w)}</li>`).join("") : "<li>Not placed in the game yet</li>"}</ul></div>
+      </div>
+    </article>`;
+  }
+
+  const grid = document.getElementById("grid");
+  function draw() {
+    const q = st.q.trim().toLowerCase();
+    let list = megas.filter(m =>
+      (!q || [m.name, m.speciesName, m.ability, m.stone, ...m.types].join(" ").toLowerCase().includes(q)) &&
+      (st.types.size === 0 || m.types.some(t => st.types.has(t))) &&
+      (st.state === "all" || (st.state === "made" ? m.made : st.state === "wip" ? !m.made : m.abilityNew)));
+    const by = { dex: (a, b) => a.species - b.species, bst: (a, b) => b.bst - a.bst || a.species - b.species, gain: (a, b) => b.gain - a.gain || a.species - b.species, name: (a, b) => a.name.localeCompare(b.name) }[st.sort];
+    list.sort(by);
+    grid.innerHTML = list.length ? list.map(card).join("") : `<div class="empty">No Mega matches. Clear the search or the type filters.</div>`;
+    typeRow.querySelector(".count")?.remove();
+    const c = document.createElement("span"); c.className = "count"; c.textContent = `${list.length} of ${megas.length}`;
+    typeRow.appendChild(c);
+  }
+  grid.addEventListener("click", e => {
+    const b = e.target.closest(".toggle button"); if (!b || b.disabled) return;
+    st.perCard[b.dataset.s] = b.dataset.v === "1"; draw();
+  });
+  document.getElementById("q").addEventListener("input", e => { st.q = e.target.value; draw(); });
+  document.getElementById("sort").addEventListener("change", e => { st.sort = e.target.value; draw(); });
+  document.getElementById("state").addEventListener("change", e => { st.state = e.target.value; draw(); });
+  const all = document.getElementById("allShiny");
+  all.addEventListener("click", () => { st.shiny = !st.shiny; st.perCard = {}; all.setAttribute("aria-pressed", st.shiny); all.textContent = st.shiny ? "Show all normal" : "Show all shinies"; draw(); });
+  draw();
+
+  // ---- the ability list: who has which ability ----
+  const abilities = JSON.parse(document.getElementById("abdata").textContent);
+  const byName = Object.fromEntries(megas.map(m => [m.name, m]));
+  document.getElementById("nMegas").textContent = megas.length;
+  document.getElementById("nAbilities").textContent = abilities.length;
+  const ab = { q: "", kind: "all" };
+  const ablist = document.getElementById("ablist");
+  function abRow(a) {
+    const flags = (a.isNew ? `<span class="flag newab">New</span>` : `<span class="flag game">From the game</span>`) +
+      (a.works ? "" : `<span class="flag off">${a.partly ? "Partly working in battle" : "Not working in battle yet"}</span>`);
+    const owners = a.megas.length
+      ? `<div class="list">${a.megas.map(o => { const m = byName[o.name]; return `<button type="button" class="owner${m && m.icon ? "" : " noicon"}" data-mega="${esc(o.name)}">${m && m.icon ? `<img src="${m.icon}" alt="" width="40" height="20">` : ""}${esc(o.name)}</button>`; }).join("")}</div>`
+      : `<div class="nobody">Not given to a Mega yet</div>`;
+    return `<article class="ab">
+      <div><div class="head"><h2>${esc(a.name)}</h2>${flags}${a.isNew ? `<span class="num">#${a.id}</span>` : ""}</div>
+        ${a.text ? `<p>${esc(a.text)}</p>` : ""}
+        ${a.combines && a.combines.length ? `<div class="copies">Also does everything ${a.combines.map(esc).join(" and ")} ${a.combines.length > 1 ? "do" : "does"}.</div>` : ""}</div>
+      <div class="owners"><h3>Belongs to</h3>${owners}</div>
+    </article>`;
+  }
+  function drawAbilities() {
+    const q = ab.q.trim().toLowerCase();
+    const list = abilities.filter(a =>
+      (!q || [a.name, a.text, ...a.megas.map(o => o.name)].join(" ").toLowerCase().includes(q)) &&
+      (ab.kind === "all" || (ab.kind === "new" ? a.isNew : ab.kind === "game" ? !a.isNew : ab.kind === "free" ? a.megas.length === 0 : !a.works)));
+    list.sort((x, y) => (y.isNew - x.isNew) || x.name.localeCompare(y.name));
+    ablist.innerHTML = list.length ? list.map(abRow).join("") : `<div class="empty">No ability matches.</div>`;
+    document.getElementById("acount").textContent = `${list.length} of ${abilities.length}`;
+  }
+  document.getElementById("aq").addEventListener("input", e => { ab.q = e.target.value; drawAbilities(); });
+  document.getElementById("akind").addEventListener("change", e => { ab.kind = e.target.value; drawAbilities(); });
+  drawAbilities();
+
+  // clicking a Mega in the list: show its card
+  ablist.addEventListener("click", e => {
+    const b = e.target.closest(".owner"); if (!b) return;
+    const qBox = document.getElementById("q");
+    qBox.value = b.dataset.mega; st.q = b.dataset.mega; st.types.clear();
+    typeRow.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", "false"));
+    st.state = "all"; document.getElementById("state").value = "all";
+    draw();
+    location.hash = "megas";
+  });
+
+  // two sections, picked by the link's #megas / #abilities
+  function route() {
+    const abil = location.hash === "#abilities";
+    document.getElementById("viewAbilities").hidden = !abil;
+    document.getElementById("viewMegas").hidden = abil;
+    document.getElementById("tabAbilities").setAttribute("aria-current", abil ? "page" : "false");
+    document.getElementById("tabMegas").setAttribute("aria-current", abil ? "false" : "page");
+  }
+  window.addEventListener("hashchange", () => { route(); window.scrollTo({ top: 0 }); });
+  route();
+})();
+</script>
